@@ -72,7 +72,7 @@ public:
     virtual ~Expr() = default;
     virtual void Print(std::ostream& out) const = 0;
     virtual void DoPrintFormula(std::ostream& out, ExprPrecedence precedence) const = 0;
-    virtual double Evaluate(/*добавьте сюда нужные аргументы*/ args) const = 0;
+    virtual double Evaluate(const std::function<double(Position)>& args) const = 0;
 
     // higher is tighter
     virtual ExprPrecedence GetPrecedence() const = 0;
@@ -141,9 +141,42 @@ public:
                 return static_cast<ExprPrecedence>(INT_MAX);
         }
     }
+    
+    double Evaluate(const std::function<double(Position)>& args) const override 
+    {
+        double result;
+        switch (type_) 
+        {
+            case Add:
+                {
+                    result = lhs_->Evaluate(args) + rhs_->Evaluate(args);
+                    break;
+                }
+            case Subtract:
+                {
+                    result = lhs_->Evaluate(args) - rhs_->Evaluate(args);
+                    break;
+                }
+            case Multiply:
+                {
+                    result = lhs_->Evaluate(args) * rhs_->Evaluate(args);
+                    break;
+                }
+            case Divide:
+                {
+                    result = lhs_->Evaluate(args) / rhs_->Evaluate(args);
+                    break;
+                }
+        }
 
-    double Evaluate(/*добавьте нужные аргументы*/) const override {
-			// Скопируйте ваше решение из предыдущих уроков.
+        if (std::isfinite(result))
+        {
+            return result;
+        }
+        else
+        {
+            throw FormulaError(FormulaError::Category::Div0);
+        }
     }
 
 private:
@@ -180,8 +213,13 @@ public:
         return EP_UNARY;
     }
 
-    double Evaluate(/*добавьте нужные аргументы*/ args) const override {
-        // Скопируйте ваше решение из предыдущих уроков.
+    double Evaluate(const std::function<double(Position)>& args) const override 
+    {
+        if (type_ == Type::UnaryMinus)
+            {
+                return (-1.0) * operand_.get()->Evaluate(args);
+            }
+            return operand_.get()->Evaluate(args);
     }
 
 private:
@@ -211,8 +249,9 @@ public:
         return EP_ATOM;
     }
 
-    double Evaluate(/*добавьте нужные аргументы*/ args) const override {
-        // реализуйте метод.
+    double Evaluate(const std::function<double(Position)>& args) const override 
+    {
+        return args(*cell_);
     }
 
 private:
@@ -237,7 +276,8 @@ public:
         return EP_ATOM;
     }
 
-    double Evaluate(/*добавьте нужные аргументы*/ args) const override {
+    double Evaluate(const std::function<double(Position)>& args) const override 
+    {
         return value_;
     }
 
@@ -391,8 +431,9 @@ void FormulaAST::PrintFormula(std::ostream& out) const {
     root_expr_->PrintFormula(out, ASTImpl::EP_ATOM);
 }
 
-double FormulaAST::Execute(/*добавьте нужные аргументы*/ args) const {
-    return root_expr_->Evaluate(/*добавьте нужные аргументы*/ args);
+double FormulaAST::Execute(const std::function<double(Position)>& args) const 
+{
+    return root_expr_->Evaluate(args);
 }
 
 FormulaAST::FormulaAST(std::unique_ptr<ASTImpl::Expr> root_expr, std::forward_list<Position> cells)
